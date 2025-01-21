@@ -38,3 +38,18 @@ scaled_data = scaler.fit_transform(dataset)
 
 scaled_data
 
+# Create the training dataset
+# Create the scaled training data set
+train_data = scaled_data[0:training_data_len, :]
+
+# Split the data into x_train and y_train data sets
+x_train = []
+y_train = []
+
+for i in range(500, len(train_data)):
+  x_train.append(train_data[i-500:i, 0])
+  y_train.append(train_data[i, 0])
+  if i <= 500:
+    print(x_train)
+    print(y_train)
+    print()
