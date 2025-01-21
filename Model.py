@@ -53,3 +53,23 @@ for i in range(500, len(train_data)):
     print(x_train)
     print(y_train)
     print()
+    
+    # Convert the x_trainand y_train to numpy arrays
+x_train, y_train = np.array(x_train), np.array(y_train)
+
+# Reshape the data
+x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
+x_train.shape
+
+# Build the LSTM model
+model = Sequential()
+model.add(LSTM(50, return_sequences=True, input_shape=(x_train.shape[1], 1)))
+model.add(LSTM(50, return_sequences=False))
+model.add(Dense(25))
+model.add(Dense(1))
+
+# Compile the model
+model.compile(optimizer='adam', loss='mean_squared_error')
+
+# TRAIN THE MODEL
+model.fit(x_train, y_train, batch_size=1, epochs=1)
