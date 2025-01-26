@@ -52,5 +52,14 @@ x_train, y_train = np.array(x_train), np.array(y_train)
 # Reshape data for LSTM input
 x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
 
+# Build the LSTM model
+model = Sequential([
+    LSTM(128, return_sequences=True, input_shape=(x_train.shape[1], 1)),
+    Dropout(0.2),
+    LSTM(128, return_sequences=False),
+    Dropout(0.2),
+    Dense(50, activation='relu'),
+    Dense(1)
+])
 
 
