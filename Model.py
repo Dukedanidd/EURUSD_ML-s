@@ -62,4 +62,12 @@ model = Sequential([
     Dense(1)
 ])
 
+# Compile the model
+model.compile(optimizer=Adam(learning_rate=0.0005), loss='huber')
+
+# Train the model
+# Train the model
+early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+model.fit(x_train, y_train, validation_split=0.2, batch_size=32, epochs=50, callbacks=[early_stop])
+
 
