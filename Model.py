@@ -79,5 +79,25 @@ y_test = dataset[training_data_len:, :]
 
 for i in range(window_size, len(test_data)):
     x_test.append(test_data[i-window_size:i, 0])
+    
+# Convert to numpy array and reshape for LSTM input
+x_test = np.array(x_test)
+x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))
+
+# Make predictions
+predictions = model.predict(x_test)
+predictions = scaler.inverse_transform(predictions)
+
+# Evaluate the model
+rmse = np.sqrt(mean_squared_error(y_test, predictions))
+mae = mean_absolute_error(y_test, predictions)
+mape = np.mean(np.abs((y_test - predictions) / y_test)) * 100
+
+print(f'RMSE: {rmse}')
+print(f'MAE: {mae}')
+print(f'MAPE: {mape}%')
+
+effectiveness = 100 - mape
+print(f"Metrics -> RMSE: {rmse:.4f}, MAE: {mae:.4f}, MAPE: {mape:.2f}%, Effectiveness: {effectiveness:.2f}%")
 
 
