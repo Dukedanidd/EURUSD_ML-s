@@ -114,4 +114,39 @@ plt.plot(valid[['Close', 'Predictions']])
 plt.legend(['Train', 'Validation', 'Predictions'], loc='lower right')
 plt.show()
 
+# Future predictions
+future_predictions = []
+last_window = scaled_data[-window_size:]
+current_input = last_window.reshape(1, window_size, 1)
+
+# Predict for the next 10 days
+for _ in range(20):
+    next_prediction = model.predict(current_input)
+    future_predictions.append(next_prediction[0, 0])
+    current_input = np.append(current_input[:, 1:, :], next_prediction.reshape(1, 1, 1), axis=1)
+
+# Transform the predictions back to the original scale
+future_predictions = scaler.inverse_transform(np.array(future_predictions).reshape(-1, 1))
+
+# Generate future dates
+last_date = data.index[-1]
+future_dates = pd.date_range(start=last_date, periods=len(future_predictions) + 1, freq='B')[1:]
+
+print("Predicted values for the next 10 days:")
+for i, (value, date) in enumerate(zip(future_predictions, future_dates), 1):
+    print(f"Day {i} ({date.date()}): {value[0]:.6f} USD")
+
+# Plot future predictions
+plt.figure(figsize=(12, 6))
+plt.plot(data.index, data['Close'], label='Actual Data', color='blue')
+plt.plot(future_dates, future_predictions, label='Future Predictions', linestyle='--', color='red')
+
+plt.xlabel('Date', fontsize=12)
+plt.ylabel('Closing Price ($USD)', fontsize=12)
+plt.title('Future Predictions (Next 10 Days)', fontsize=14)
+plt.legend(loc='best')
+plt.grid(True)
+plt.show()
+
+
 
