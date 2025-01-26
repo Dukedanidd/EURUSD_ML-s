@@ -100,4 +100,18 @@ print(f'MAPE: {mape}%')
 effectiveness = 100 - mape
 print(f"Metrics -> RMSE: {rmse:.4f}, MAE: {mae:.4f}, MAPE: {mape:.2f}%, Effectiveness: {effectiveness:.2f}%")
 
+# Visualize predictions
+train = data[:training_data_len]
+valid = data[training_data_len:]
+valid['Predictions'] = predictions
+
+plt.figure(figsize=(15, 6))
+plt.title('Model')
+plt.xlabel('Date', fontsize=10)
+plt.ylabel('Close Price (USD)', fontsize=10)
+plt.plot(train['Close'])
+plt.plot(valid[['Close', 'Predictions']])
+plt.legend(['Train', 'Validation', 'Predictions'], loc='lower right')
+plt.show()
+
 
