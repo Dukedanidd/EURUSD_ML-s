@@ -40,7 +40,7 @@ train_data = scaled_data[:training_data_len, :]
 # Split data into x_train and y_train
 x_train = []
 y_train = []
-window_size = 300
+window_size = 1000
 
 for i in range(window_size, len(train_data)):
     x_train.append(train_data[i-window_size:i, 0])
