@@ -14,3 +14,11 @@ import yfinance as yf
 ticker = 'EURUSD=X'
 df = yf.download(ticker, start='2016-01-01', end='2025-01-29', interval='1d')
 df.head(21)
+
+# Create graph
+plt.figure(figsize=(16,8))
+plt.plot(df['Close'])
+plt.xlabel('Date', fontsize=16)
+plt.ylabel('Close Price USD ($)', fontsize=16)
+plt.title('Close Price History', fontsize=16)
+plt.show()
