@@ -35,3 +35,20 @@ training_data_len = math.ceil(len(dataset) * 0.8)
 # Scale the data between 0 and 1
 scaler = MinMaxScaler(feature_range=(0, 1))
 scaled_data = scaler.fit_transform(dataset)
+
+# Create the training dataset
+train_data = scaled_data[:training_data_len, :]
+
+# Split data into x_train and y_train
+x_train = []
+y_train = []
+window_size = 100
+for i in range(window_size, len(train_data)):
+    x_train.append(train_data[i-window_size:i, 0])
+    y_train.append(train_data[i, 0])
+    
+# Convert to numpy arrays
+x_train, y_train = np.array(x_train), np.array(y_train)
+
+# Reshape data for LSTM input
+x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
