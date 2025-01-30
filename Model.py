@@ -88,3 +88,28 @@ x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))
 predictions = model.predict(x_test)
 predictions = scaler.inverse_transform(predictions)
 
+# Evaluate the model
+rmse = np.sqrt(mean_squared_error(y_test, predictions))
+mae = mean_absolute_error(y_test, predictions)
+mape = np.mean(np.abs((y_test - predictions) / y_test)) * 100
+
+print(f'RMSE: {rmse}')
+print(f'MAE: {mae}')
+print(f'MAPE: {mape}%')
+
+effectiveness = 100 - mape
+print(f"Metrics -> RMSE: {rmse:.4f}, MAE: {mae:.4f}, MAPE: {mape:.2f}%, Effectiveness: {effectiveness:.2f}%")
+
+# Visualize predictions
+train = data[:training_data_len]
+valid = data[training_data_len:]
+valid['Predictions'] = predictions
+
+plt.figure(figsize=(15, 6))
+plt.title('Model')
+plt.xlabel('Date', fontsize=10)
+plt.ylabel('Close Price (USD)', fontsize=10)
+plt.plot(train['Close'])
+plt.plot(valid[['Close', 'Predictions']])
+plt.legend(['Train', 'Validation', 'Predictions'], loc='lower right')
+plt.show()
