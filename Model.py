@@ -70,3 +70,21 @@ model.compile(optimizer=Adam(learning_rate=0.0005), loss='huber')
 early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 model.fit(x_train, y_train, validation_split=0.2, batch_size=32, epochs=50, callbacks=[early_stop])
 
+# Create the testing dataset
+test_data = scaled_data[training_data_len - window_size:, :]
+
+# Split into x_test and y_test
+x_test = []
+y_test = dataset[training_data_len:, :]
+
+for i in range(window_size, len(test_data)):
+    x_test.append(test_data[i-window_size:i, 0])
+    
+# Convert to numpy array and reshape for LSTM input
+x_test = np.array(x_test)
+x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))
+
+# Make predictions
+predictions = model.predict(x_test)
+predictions = scaler.inverse_transform(predictions)
+
