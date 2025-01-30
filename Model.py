@@ -52,3 +52,21 @@ x_train, y_train = np.array(x_train), np.array(y_train)
 
 # Reshape data for LSTM input
 x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
+
+# Build the LSTM model
+model = Sequential([
+    LSTM(128, return_sequences=True, input_shape=(x_train.shape[1], 1)),
+    Dropout(0.2),
+    LSTM(128, return_sequences=False),
+    Dropout(0.2),
+    Dense(50, activation='relu'),
+    Dense(1)
+])
+
+# Compile the model
+model.compile(optimizer=Adam(learning_rate=0.0005), loss='huber')
+
+# Train the model
+early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+model.fit(x_train, y_train, validation_split=0.2, batch_size=32, epochs=50, callbacks=[early_stop])
+
