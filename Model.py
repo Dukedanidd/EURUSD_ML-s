@@ -22,3 +22,16 @@ plt.xlabel('Date', fontsize=16)
 plt.ylabel('Close Price USD ($)', fontsize=16)
 plt.title('Close Price History', fontsize=16)
 plt.show()
+
+# Create a new DataFrame with only the 'Close' column
+data = df[['Close']]
+
+# Convert the DataFrame to a numpy array
+dataset = data.values
+
+# Define the training data length (80% of the dataset)
+training_data_len = math.ceil(len(dataset) * 0.8)
+
+# Scale the data between 0 and 1
+scaler = MinMaxScaler(feature_range=(0, 1))
+scaled_data = scaler.fit_transform(dataset)
