@@ -169,3 +169,54 @@ plt.plot(valid['Close'], label='Validación')
 plt.plot(valid['Predictions'], label='Predicciones')
 plt.legend(loc='lower right')
 plt.show()
+
+# Predicciones futuras
+def predict_future(model, last_window, scaler, future_steps):
+    future_predictions = []
+    current_input = last_window.reshape(1, window_size, x_test.shape[2])
+
+    for _ in range(future_steps):
+        # Predecir el siguiente valor
+        prediction = model.predict(current_input)[0, 0]
+        future_predictions.append(prediction)
+
+        # Actualizar la ventana de entrada
+        current_input = np.roll(current_input, shift=-1, axis=1)
+        current_input[0, -1, -1] = prediction  # Agregar la nueva predicción en la última posición
+
+    # Invertir la escala de las predicciones
+    future_predictions_scaled = np.concatenate(
+        (np.repeat(current_input[:, -1, :3], len(future_predictions), axis=0),  # Mantener otras características
+         np.array(future_predictions).reshape(-1, 1)),  # Agregar las predicciones
+        axis=1
+    )
+    future_predictions = scaler.inverse_transform(future_predictions_scaled)[:, -1]
+
+    return future_predictions
+
+# Obtener la última ventana de datos
+last_window = scaled_test_data[-window_size:]
+
+# Predecir los próximos 30 días
+future_steps = 30
+future_predictions = predict_future(model, last_window, scaler, future_steps)
+
+# Generar fechas futuras
+last_date = data.index[-1]
+future_dates = pd.date_range(start=last_date, periods=future_steps + 1, freq='B')[1:]
+
+# Mostrar predicciones
+print("Predicciones para los próximos 30 días:")
+for i, (value, date) in enumerate(zip(future_predictions, future_dates), 1):
+    print(f"Día {i} ({date.date()}): {value:.6f} USD")
+
+# Graficar predicciones futuras
+plt.figure(figsize=(12, 6))
+plt.plot(data.index, data['Close'], label='Datos Reales', color='blue')
+plt.plot(future_dates, future_predictions, label='Predicciones Futuras', linestyle='--', color='red')
+plt.xlabel('Fecha', fontsize=12)
+plt.ylabel('Precio de Cierre (USD)', fontsize=12)
+plt.title('Predicciones para los Próximos 30 Días', fontsize=14)
+plt.legend(loc='best')
+plt.grid(True)
+plt.show()
