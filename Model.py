@@ -1,152 +1,27 @@
-# Import libraries
+# Importar librerías
 import math
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from sklearn.model_selection import TimeSeriesSplit
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, LSTM, Dropout, BatchNormalization
+from tensorflow.keras.layers import Dense, LSTM, Dropout, BatchNormalization, Conv1D, MaxPooling1D, Flatten
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
-plt.style.use('fivethirtyeight')
 import yfinance as yf
-# Get stock data
+# Estilo de gráficos
+plt.style.use('fivethirtyeight')
+
+# Descargar datos de EUR/USD
 ticker = 'EURUSD=X'
-df = yf.download(ticker, start='2016-01-01', end='2025-01-29', interval='1d')
-df.head(21)
+df = yf.download(ticker, start='2012-01-01', end='2025-01-31', interval='1d')
 
-# Create graph
-plt.figure(figsize=(16,8))
-plt.plot(df['Close'])
-plt.xlabel('Date', fontsize=16)
-plt.ylabel('Close Price USD ($)', fontsize=16)
-plt.title('Close Price History', fontsize=16)
-plt.show()
+# Seleccionar columnas relevantes
+data = df[['Close', 'Open', 'High', 'Low']]
 
-# Create a new DataFrame with only the 'Close' column
-data = df[['Close']]
-
-# Convert the DataFrame to a numpy array
+# Convertir a numpy array
 dataset = data.values
 
-# Define the training data length (80% of the dataset)
-training_data_len = math.ceil(len(dataset) * 0.8)
-
-# Scale the data between 0 and 1
-scaler = MinMaxScaler(feature_range=(0, 1))
-scaled_data = scaler.fit_transform(dataset)
-
-# Create the training dataset
-train_data = scaled_data[:training_data_len, :]
-
-# Split data into x_train and y_train
-x_train = []
-y_train = []
-window_size = 100
-for i in range(window_size, len(train_data)):
-    x_train.append(train_data[i-window_size:i, 0])
-    y_train.append(train_data[i, 0])
-    
-# Convert to numpy arrays
-x_train, y_train = np.array(x_train), np.array(y_train)
-
-# Reshape data for LSTM input
-x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
-
-# Build the LSTM model
-model = Sequential([
-    LSTM(128, return_sequences=True, input_shape=(x_train.shape[1], 1)),
-    Dropout(0.2),
-    LSTM(128, return_sequences=False),
-    Dropout(0.2),
-    Dense(50, activation='relu'),
-    Dense(1)
-])
-
-# Compile the model
-model.compile(optimizer=Adam(learning_rate=0.0005), loss='huber')
-
-# Train the model
-early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
-model.fit(x_train, y_train, validation_split=0.2, batch_size=32, epochs=50, callbacks=[early_stop])
-
-# Create the testing dataset
-test_data = scaled_data[training_data_len - window_size:, :]
-
-# Split into x_test and y_test
-x_test = []
-y_test = dataset[training_data_len:, :]
-
-for i in range(window_size, len(test_data)):
-    x_test.append(test_data[i-window_size:i, 0])
-    
-# Convert to numpy array and reshape for LSTM input
-x_test = np.array(x_test)
-x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))
-
-# Make predictions
-predictions = model.predict(x_test)
-predictions = scaler.inverse_transform(predictions)
-
-# Evaluate the model
-rmse = np.sqrt(mean_squared_error(y_test, predictions))
-mae = mean_absolute_error(y_test, predictions)
-mape = np.mean(np.abs((y_test - predictions) / y_test)) * 100
-
-print(f'RMSE: {rmse}')
-print(f'MAE: {mae}')
-print(f'MAPE: {mape}%')
-
-effectiveness = 100 - mape
-print(f"Metrics -> RMSE: {rmse:.4f}, MAE: {mae:.4f}, MAPE: {mape:.2f}%, Effectiveness: {effectiveness:.2f}%")
-
-# Visualize predictions
-train = data[:training_data_len]
-valid = data[training_data_len:]
-valid['Predictions'] = predictions
-
-plt.figure(figsize=(15, 6))
-plt.title('Model')
-plt.xlabel('Date', fontsize=10)
-plt.ylabel('Close Price (USD)', fontsize=10)
-plt.plot(train['Close'])
-plt.plot(valid[['Close', 'Predictions']])
-plt.legend(['Train', 'Validation', 'Predictions'], loc='lower right')
-plt.show()
-
-# Future predictions
-future_predictions = []
-last_window = scaled_data[-window_size:]
-current_input = last_window.reshape(1, window_size, 1)
-
-# Predict for the next 10 days
-for _ in range(50):
-    next_prediction = model.predict(current_input)
-    future_predictions.append(next_prediction[0, 0])
-    current_input = np.append(current_input[:, 1:, :], next_prediction.reshape(1, 1, 1), axis=1)
-
-# Transform the predictions back to the original scale
-future_predictions = scaler.inverse_transform(np.array(future_predictions).reshape(-1, 1))
-
-# Generate future dates
-last_date = data.index[-1]
-future_dates = pd.date_range(start=last_date, periods=len(future_predictions) + 1, freq='B')[1:]
-
-print("Predicted values for the next 10 days:")
-for i, (value, date) in enumerate(zip(future_predictions, future_dates), 1):
-    print(f"Day {i} ({date.date()}): {value[0]:.6f} USD")
-    
-
-# Plot future predictions
-plt.figure(figsize=(12, 6))
-plt.plot(data.index, data['Close'], label='Actual Data', color='blue')
-plt.plot(future_dates, future_predictions, label='Future Predictions', linestyle='--', color='red')
-
-plt.xlabel('Date', fontsize=12)
-plt.ylabel('Closing Price ($USD)', fontsize=12)
-plt.title('Future Predictions (Next 10 Days)', fontsize=14)
-plt.legend(loc='best')
-plt.grid(True)
-plt.show()
+# Definir tamaño de ventana
+window_size = 180
