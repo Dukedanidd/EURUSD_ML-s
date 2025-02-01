@@ -150,3 +150,22 @@ print(f'RMSE: {rmse:.4f}')
 print(f'MAE: {mae:.4f}')
 print(f'MAPE: {mape:.2f}%')
 print(f'Efectividad: {effectiveness:.2f}%')
+
+
+# Crear un DataFrame para las predicciones
+predictions_df = pd.DataFrame(predictions, index=data.index[training_data_len + window_size:], columns=['Predictions'])
+
+# Combinar con los datos originales
+valid = data[training_data_len + window_size:].copy()
+valid['Predictions'] = predictions_df['Predictions']
+
+# Graficar resultados
+plt.figure(figsize=(15, 6))
+plt.title('Modelo CNN + LSTM con múltiples características')
+plt.xlabel('Fecha', fontsize=10)
+plt.ylabel('Precio de Cierre (USD)', fontsize=10)
+plt.plot(data['Close'][:training_data_len], label='Train')
+plt.plot(valid['Close'], label='Validación')
+plt.plot(valid['Predictions'], label='Predicciones')
+plt.legend(loc='lower right')
+plt.show()
