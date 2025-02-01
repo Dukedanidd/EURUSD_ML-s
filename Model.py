@@ -96,3 +96,25 @@ model.compile(optimizer=Adam(learning_rate=0.001), loss='huber')
 
 # Resumen del modelo
 model.summary()
+
+# Early Stopping
+early_stop = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
+
+# Entrenar el modelo
+history = model.fit(
+    x_train, y_train,
+    validation_split=0.2,
+    batch_size=32,
+    epochs=100,
+    callbacks=[early_stop]
+)
+
+# Graficar la pérdida durante el entrenamiento
+plt.figure(figsize=(10, 6))
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.title('Pérdida durante el entrenamiento')
+plt.xlabel('Épocas')
+plt.ylabel('Pérdida')
+plt.legend()
+plt.show()
