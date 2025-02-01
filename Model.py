@@ -118,3 +118,35 @@ plt.xlabel('Épocas')
 plt.ylabel('Pérdida')
 plt.legend()
 plt.show()
+
+# Verificar si x_test tiene datos
+if len(x_test) == 0:
+    raise ValueError("x_test está vacío. Revisa la creación del conjunto de prueba.")
+
+# Hacer predicciones
+predictions = model.predict(x_test)
+
+# Invertir la escala de las predicciones
+predictions = scaler.inverse_transform(np.concatenate((x_test[:, -1, :3], predictions), axis=1))[:, 3]
+
+# Verificar la forma de y_test y predictions
+print("Forma de y_test:", y_test.shape)
+print("Forma de predictions:", predictions.shape)
+
+# Asegurarse de que y_test y predictions sean 1D
+if len(y_test.shape) > 1:
+    y_test = y_test[:, 0]  # Seleccionar solo la primera columna si es 2D
+
+if len(predictions.shape) > 1:
+    predictions = predictions[:, 0]  # Seleccionar solo la primera columna si es 2D
+
+# Calcular métricas
+rmse = np.sqrt(mean_squared_error(y_test, predictions))
+mae = mean_absolute_error(y_test, predictions)
+mape = np.mean(np.abs((y_test - predictions) / y_test)) * 100
+effectiveness = 100 - mape
+
+print(f'RMSE: {rmse:.4f}')
+print(f'MAE: {mae:.4f}')
+print(f'MAPE: {mape:.2f}%')
+print(f'Efectividad: {effectiveness:.2f}%')
