@@ -67,3 +67,32 @@ print("Forma de y_test:", y_test.shape)
 # Verificar si x_test tiene datos
 if len(x_test) == 0:
     raise ValueError("x_test está vacío. Revisa la creación del conjunto de prueba.")
+
+# Construir el modelo CNN + LSTM
+model = Sequential([
+    # Capa convolucional
+    Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(x_train.shape[1], x_train.shape[2])),
+    MaxPooling1D(pool_size=2),
+    Dropout(0.3),
+
+    # Capa LSTM
+    LSTM(128, return_sequences=True),
+    Dropout(0.3),
+    BatchNormalization(),
+
+    # Otra capa LSTM
+    LSTM(64, return_sequences=False),
+    Dropout(0.3),
+    BatchNormalization(),
+
+    # Capas densas
+    Dense(50, activation='relu'),
+    Dense(25, activation='relu'),
+    Dense(1)
+])
+
+# Compilar el modelo
+model.compile(optimizer=Adam(learning_rate=0.001), loss='huber')
+
+# Resumen del modelo
+model.summary()
