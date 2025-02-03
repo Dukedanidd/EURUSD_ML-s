@@ -1,222 +1,119 @@
-# Importar librerías
-import math
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import mean_squared_error, mean_absolute_error
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, LSTM, Dropout, BatchNormalization, Conv1D, MaxPooling1D, Flatten
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping
 import yfinance as yf
-# Estilo de gráficos
-plt.style.use('fivethirtyeight')
+import ta as ta
+import math
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from sklearn.preprocessing import MinMaxScaler
+import matplotlib.pyplot as plt
 
-# Descargar datos de EUR/USD
-ticker = 'EURUSD=X'
-df = yf.download(ticker, start='2012-01-01', end='2025-01-31', interval='1d')
+# Descargar datos
+symbol = "EURUSD=X"
+df = yf.download(symbol, start="2010-01-01", end="2024-01-01", interval="1d")
 
-# Seleccionar columnas relevantes
-data = df[['Close', 'Open', 'High', 'Low']]
+# Preparar datos
+df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
+df.dropna(inplace=True)
 
-# Convertir a numpy array
-dataset = data.values
+# Indicadores técnicos
+df['SMA_50'] = df['Close'].rolling(window=50).mean()
+df['SMA_200'] = df['Close'].rolling(window=200).mean()
+df['RSI'] = ta.momentum.RSIIndicator(df['Close'].squeeze(), window=14).rsi()
+macd = ta.trend.MACD(df['Close'].squeeze())
+df['MACD'] = macd.macd()
+df['MACD_signal'] = macd.macd_signal()
 
-# Definir tamaño de ventana
-window_size = 180
+# Señales de trading
+df['Signal'] = 0
+df.loc[(df['SMA_50'] > df['SMA_200']) & (df['RSI'] < 30), 'Signal'] = 1
+df.loc[(df['SMA_50'] < df['SMA_200']) & (df['RSI'] > 70), 'Signal'] = -1
 
-# Dividir en conjuntos de entrenamiento y prueba
-training_data_len = math.ceil(len(dataset) * 0.8)
+# Eliminar filas con NaN después de crear indicadores
+df.dropna(inplace=True)
 
-# Verificar que training_data_len sea menor que el tamaño total de los datos
-if training_data_len >= len(dataset):
-    raise ValueError("El tamaño de los datos de entrenamiento es mayor o igual al tamaño total de los datos. Ajusta el porcentaje de división.")
+# Preparar datos para el escalado
+features = ['Close', 'SMA_50', 'SMA_200', 'RSI', 'MACD', 'MACD_signal', 'Signal']
+scaler = MinMaxScaler()
+scaled_data = scaler.fit_transform(df[features])
 
-train_data = dataset[:training_data_len]
-test_data = dataset[training_data_len:]
+# Crear secuencias para LSTM
+window_size = 60
+X, y = [], []
 
-# Verificar que test_data no esté vacío
-if len(test_data) == 0:
-    raise ValueError("El conjunto de prueba está vacío. Revisa la división de los datos.")
+for i in range(window_size, len(scaled_data)):
+    X.append(scaled_data[i-window_size:i])
+    y.append(scaled_data[i, 0])  # Índice 0 corresponde al precio de cierre
 
-# Escalar datos
-scaler = MinMaxScaler(feature_range=(0, 1))
-scaled_train_data = scaler.fit_transform(train_data)
-scaled_test_data = scaler.transform(test_data)
+X, y = np.array(X), np.array(y)
 
+# División de datos
+train_size = int(len(X) * 0.8)
+X_train, X_test = X[:train_size], X[train_size:]
+y_train, y_test = y[:train_size], y[train_size:]
 
-# Crear ventanas de datos
-def create_dataset(data, window_size):
-    x, y = [], []
-    if len(data) > window_size:
-        for i in range(window_size, len(data)):
-            x.append(data[i-window_size:i, :])  # Usar todas las características
-            y.append(data[i, 0])  # Predecir 'Close'
-    else:
-        raise ValueError(f"El tamaño de los datos ({len(data)}) es menor que el window_size ({window_size}). Ajusta el window_size o usa más datos.")
-    return np.array(x), np.array(y)
-
-x_train, y_train = create_dataset(scaled_train_data, window_size)
-x_test, y_test = create_dataset(scaled_test_data, window_size)
-
-# Verificar la forma de x_test y y_test
-print("Forma de x_test:", x_test.shape)
-print("Forma de y_test:", y_test.shape)
-
-# Verificar si x_test tiene datos
-if len(x_test) == 0:
-    raise ValueError("x_test está vacío. Revisa la creación del conjunto de prueba.")
-
-# Construir el modelo CNN + LSTM
+# Modelo LSTM
 model = Sequential([
-    # Capa convolucional
-    Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(x_train.shape[1], x_train.shape[2])),
-    MaxPooling1D(pool_size=2),
-    Dropout(0.3),
-
-    # Capa LSTM
-    LSTM(128, return_sequences=True),
-    Dropout(0.3),
-    BatchNormalization(),
-
-    # Otra capa LSTM
-    LSTM(64, return_sequences=False),
-    Dropout(0.3),
-    BatchNormalization(),
-
-    # Capas densas
-    Dense(50, activation='relu'),
-    Dense(25, activation='relu'),
+    LSTM(50, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])),
+    Dropout(0.2),
+    LSTM(50, return_sequences=False),
+    Dropout(0.2),
+    Dense(25),
     Dense(1)
 ])
 
-# Compilar el modelo
-model.compile(optimizer=Adam(learning_rate=0.001), loss='huber')
+model.compile(optimizer='adam', loss='mean_squared_error')
+model.fit(X_train, y_train, epochs=20, batch_size=32, validation_data=(X_test, y_test))
 
-# Resumen del modelo
-model.summary()
+# Predicciones
+predictions = model.predict(X_test)
 
-# Early Stopping
-early_stop = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
+# Preparar datos para inverse transform
+pred_scale = np.zeros((len(predictions), len(features)))
+pred_scale[:, 0] = predictions.reshape(-1)  # Colocar predicciones en la primera columna
 
-# Entrenar el modelo
-history = model.fit(
-    x_train, y_train,
-    validation_split=0.2,
-    batch_size=32,
-    epochs=100,
-    callbacks=[early_stop]
-)
+actual_scale = np.zeros((len(y_test), len(features)))
+actual_scale[:, 0] = y_test  # Colocar valores reales en la primera columna
 
-# Graficar la pérdida durante el entrenamiento
-plt.figure(figsize=(10, 6))
-plt.plot(history.history['loss'], label='Train Loss')
-plt.plot(history.history['val_loss'], label='Validation Loss')
-plt.title('Pérdida durante el entrenamiento')
-plt.xlabel('Épocas')
-plt.ylabel('Pérdida')
-plt.legend()
-plt.show()
+# Convertir predicciones a la escala original
+predictions = scaler.inverse_transform(pred_scale)[:, 0]
+actual_values = scaler.inverse_transform(actual_scale)[:, 0]
 
-# Verificar si x_test tiene datos
-if len(x_test) == 0:
-    raise ValueError("x_test está vacío. Revisa la creación del conjunto de prueba.")
+# Filtrar valores no válidos
+mask = ~np.isnan(predictions) & ~np.isnan(actual_values) & ~np.isinf(predictions) & ~np.isinf(actual_values)
+predictions = predictions[mask]
+actual_values = actual_values[mask]
 
-# Hacer predicciones
-predictions = model.predict(x_test)
+print(f'Forma de predictions antes de filtrar: {predictions.shape}')
+print(f'Forma de actual_values antes de filtrar: {actual_values.shape}')
 
-# Invertir la escala de las predicciones
-predictions = scaler.inverse_transform(np.concatenate((x_test[:, -1, :3], predictions), axis=1))[:, 3]
+# Calcular métricas si hay datos válidos
+if len(predictions) > 0 and len(actual_values) > 0:
+    rmse = np.sqrt(mean_squared_error(actual_values, predictions))
+    mae = mean_absolute_error(actual_values, predictions)
+    mape = np.mean(np.abs((actual_values - predictions) / np.where(actual_values == 0, 1, actual_values))) * 100
+    effectiveness = 100 - mape
 
-# Verificar la forma de y_test y predictions
-print("Forma de y_test:", y_test.shape)
-print("Forma de predictions:", predictions.shape)
+    print('\nResultados:')
+    print(f'Número de predicciones válidas: {len(predictions)}')
+    print(f'RMSE: {rmse:.4f}')
+    print(f'MAE: {mae:.4f}')
+    print(f'MAPE: {mape:.2f}%')
+    print(f'Efectividad: {effectiveness:.2f}%')
 
-# Asegurarse de que y_test y predictions sean 1D
-if len(y_test.shape) > 1:
-    y_test = y_test[:, 0]  # Seleccionar solo la primera columna si es 2D
-
-if len(predictions.shape) > 1:
-    predictions = predictions[:, 0]  # Seleccionar solo la primera columna si es 2D
-
-# Calcular métricas
-rmse = np.sqrt(mean_squared_error(y_test, predictions))
-mae = mean_absolute_error(y_test, predictions)
-mape = np.mean(np.abs((y_test - predictions) / y_test)) * 100
-effectiveness = 100 - mape
-
-print(f'RMSE: {rmse:.4f}')
-print(f'MAE: {mae:.4f}')
-print(f'MAPE: {mape:.2f}%')
-print(f'Efectividad: {effectiveness:.2f}%')
-
-
-# Crear un DataFrame para las predicciones
-predictions_df = pd.DataFrame(predictions, index=data.index[training_data_len + window_size:], columns=['Predictions'])
-
-# Combinar con los datos originales
-valid = data[training_data_len + window_size:].copy()
-valid['Predictions'] = predictions_df['Predictions']
-
-# Graficar resultados
-plt.figure(figsize=(15, 6))
-plt.title('Modelo CNN + LSTM con múltiples características')
-plt.xlabel('Fecha', fontsize=10)
-plt.ylabel('Precio de Cierre (USD)', fontsize=10)
-plt.plot(data['Close'][:training_data_len], label='Train')
-plt.plot(valid['Close'], label='Validación')
-plt.plot(valid['Predictions'], label='Predicciones')
-plt.legend(loc='lower right')
-plt.show()
-
-# Predicciones futuras
-def predict_future(model, last_window, scaler, future_steps):
-    future_predictions = []
-    current_input = last_window.reshape(1, window_size, x_test.shape[2])
-
-    for _ in range(future_steps):
-        # Predecir el siguiente valor
-        prediction = model.predict(current_input)[0, 0]
-        future_predictions.append(prediction)
-
-        # Actualizar la ventana de entrada
-        current_input = np.roll(current_input, shift=-1, axis=1)
-        current_input[0, -1, -1] = prediction  # Agregar la nueva predicción en la última posición
-
-    # Invertir la escala de las predicciones
-    future_predictions_scaled = np.concatenate(
-        (np.repeat(current_input[:, -1, :3], len(future_predictions), axis=0),  # Mantener otras características
-         np.array(future_predictions).reshape(-1, 1)),  # Agregar las predicciones
-        axis=1
-    )
-    future_predictions = scaler.inverse_transform(future_predictions_scaled)[:, -1]
-
-    return future_predictions
-
-# Obtener la última ventana de datos
-last_window = scaled_test_data[-window_size:]
-
-# Predecir los próximos 30 días
-future_steps = 30
-future_predictions = predict_future(model, last_window, scaler, future_steps)
-
-# Generar fechas futuras
-last_date = data.index[-1]
-future_dates = pd.date_range(start=last_date, periods=future_steps + 1, freq='B')[1:]
-
-# Mostrar predicciones
-print("Predicciones para los próximos 30 días:")
-for i, (value, date) in enumerate(zip(future_predictions, future_dates), 1):
-    print(f"Día {i} ({date.date()}): {value:.6f} USD")
-
-# Graficar predicciones futuras
-plt.figure(figsize=(12, 6))
-plt.plot(data.index, data['Close'], label='Datos Reales', color='blue')
-plt.plot(future_dates, future_predictions, label='Predicciones Futuras', linestyle='--', color='red')
-plt.xlabel('Fecha', fontsize=12)
-plt.ylabel('Precio de Cierre (USD)', fontsize=12)
-plt.title('Predicciones para los Próximos 30 Días', fontsize=14)
-plt.legend(loc='best')
-plt.grid(True)
-plt.show()
+    # Visualización
+    plt.figure(figsize=(15,7))
+    plt.plot(actual_values, label='Valores Reales', color='blue')
+    plt.plot(predictions, label='Predicciones', color='red')
+    plt.title('Predicciones vs Valores Reales - EUR/USD')
+    plt.xlabel('Tiempo')
+    plt.ylabel('Precio')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+else:
+    print("No hay suficientes datos válidos para calcular las métricas.")
+    print("Verifique los datos de entrada y el proceso de escalado.")
