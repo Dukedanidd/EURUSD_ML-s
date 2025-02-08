@@ -69,3 +69,53 @@ model = Sequential([
 
 model.compile(optimizer='adam', loss='mean_squared_error')
 model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test))
+
+# Predicciones
+predictions = model.predict(X_test)
+
+# Preparar datos para inverse transform
+pred_scale = np.zeros((len(predictions), len(features)))
+pred_scale[:, 0] = predictions.reshape(-1)
+
+actual_scale = np.zeros((len(y_test), len(features)))
+actual_scale[:, 0] = y_test
+
+# Convertir predicciones a la escala original
+predictions = scaler.inverse_transform(pred_scale)[:, 0]
+actual_values = scaler.inverse_transform(actual_scale)[:, 0]
+
+# Filtrar valores no válidos
+mask = ~np.isnan(predictions) & ~np.isnan(actual_values) & ~np.isinf(predictions) & ~np.isinf(actual_values)
+predictions = predictions[mask]
+actual_values = actual_values[mask]
+
+print(f'Forma de predictions antes de filtrar: {predictions.shape}')
+print(f'Forma de actual_values antes de filtrar: {actual_values.shape}')
+
+# Calcular métricas si hay datos válidos
+if len(predictions) > 0 and len(actual_values) > 0:
+    rmse = np.sqrt(mean_squared_error(actual_values, predictions))
+    mae = mean_absolute_error(actual_values, predictions)
+    mape = np.mean(np.abs((actual_values - predictions) / np.where(actual_values == 0, 1, actual_values))) * 100
+    effectiveness = 100 - mape
+
+    print('\nResultados:')
+    print(f'Número de predicciones válidas: {len(predictions)}')
+    print(f'RMSE: {rmse:.4f}')
+    print(f'MAE: {mae:.4f}')
+    print(f'MAPE: {mape:.2f}%')
+    print(f'Efectividad: {effectiveness:.2f}%')
+
+    # Visualización
+    plt.figure(figsize=(15,7))
+    plt.plot(actual_values, label='Valores Reales', color='blue')
+    plt.plot(predictions, label='Predicciones', color='red')
+    plt.title('Predicciones vs Valores Reales - EUR/USD')
+    plt.xlabel('Tiempo')
+    plt.ylabel('Precio')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+else:
+    print("No hay suficientes datos válidos para calcular las métricas.")
+    print("Verifique los datos de entrada y el proceso de escalado.")
