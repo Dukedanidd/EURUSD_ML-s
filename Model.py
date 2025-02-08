@@ -119,3 +119,79 @@ if len(predictions) > 0 and len(actual_values) > 0:
 else:
     print("No hay suficientes datos válidos para calcular las métricas.")
     print("Verifique los datos de entrada y el proceso de escalado.")
+    
+def predict_future(model, last_window, scaler, future_steps, features_count):
+    """
+    Realiza predicciones futuras utilizando el modelo LSTM
+    """
+    future_predictions = []
+    current_batch = last_window.reshape(1, window_size, features_count)
+
+    for _ in range(future_steps):
+        # Hacer predicción
+        pred = model.predict(current_batch, verbose=0)[0]
+
+        # Preparar para inverse transform
+        temp_scale = np.zeros((1, features_count))
+        temp_scale[0, 0] = pred
+
+        # Invertir escalado
+        pred_unscaled = scaler.inverse_transform(temp_scale)[0, 0]
+        future_predictions.append(pred_unscaled)
+
+        # Actualizar el batch para la siguiente predicción
+        current_batch = np.roll(current_batch, -1, axis=1)
+        current_batch[0, -1] = temp_scale[0]
+
+    return np.array(future_predictions)
+
+# Obtener la última ventana de datos
+last_window = X_test[-1:]
+
+# Definir número de días para predecir
+future_steps = 7
+
+# Realizar predicciones futuras
+future_predictions = predict_future(model, last_window, scaler, future_steps, len(features))
+
+# Generar fechas futuras
+last_date = df.index[-1]
+future_dates = pd.date_range(start=last_date, periods=future_steps + 1, freq='B')[1:]
+
+# Mostrar predicciones
+print("\nPredicciones para los próximos 7 días:")
+for i, (value, date) in enumerate(zip(future_predictions, future_dates), 1):
+    print(f"Día {i} ({date.date()}): {value:.4f} USD")
+
+# Visualización
+plt.figure(figsize=(15, 7))
+
+# Plotear datos históricos (últimos 100 días)
+plt.plot(df.index[-100:], df['Close'][-100:], label='Datos Históricos', color='blue')
+
+# Plotear predicciones
+plt.plot(future_dates, future_predictions, label='Predicciones Futuras',
+         linestyle='--', color='red', linewidth=2)
+
+plt.title('EUR/USD - Histórico y Predicciones Futuras', fontsize=14)
+plt.xlabel('Fecha', fontsize=12)
+plt.ylabel('Precio (USD)', fontsize=12)
+plt.legend(fontsize=10)
+plt.grid(True, alpha=0.3)
+
+# Rotar etiquetas del eje x para mejor legibilidad
+plt.xticks(rotation=45)
+
+# Ajustar layout
+plt.tight_layout()
+
+# Mostrar gráfico
+plt.show()
+
+# Calcular estadísticas de las predicciones
+print("\nEstadísticas de las predicciones:")
+print(f"Precio inicial: {future_predictions[0]:.4f}")
+print(f"Precio final: {future_predictions[-1]:.4f}")
+print(f"Cambio total: {((future_predictions[-1] - future_predictions[0]) / future_predictions[0] * 100):.2f}%")
+print(f"Precio máximo: {np.max(future_predictions):.4f}")
+print(f"Precio mínimo: {np.min(future_predictions):.4f}")
