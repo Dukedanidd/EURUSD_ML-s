@@ -36,3 +36,23 @@ df.loc[(df['SMA_50'] > df['SMA_200']) & (df['RSI'] < 30), 'Signal'] = 1
 df.loc[(df['SMA_50'] < df['SMA_200']) & (df['RSI'] > 70), 'Signal'] = -1
 
 df.dropna(inplace=True)
+
+# Preparar datos para el escalado
+features = ['Close', 'SMA_50', 'SMA_200', 'RSI', 'MACD', 'MACD_signal', 'Signal']
+scaler = MinMaxScaler()
+scaled_data = scaler.fit_transform(df[features])
+
+# Crear secuencias para LSTM
+window_size = 50
+X, y = [], []
+
+for i in range(window_size, len(scaled_data)):
+    X.append(scaled_data[i-window_size:i])
+    y.append(scaled_data[i, 0])  # Índice 0 corresponde al precio de cierre
+
+X, y = np.array(X), np.array(y)
+
+# División de datos
+train_size = int(len(X) * 0.8)
+X_train, X_test = X[:train_size], X[train_size:]
+y_train, y_test = y[:train_size], y[train_size:]
